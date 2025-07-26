@@ -84,10 +84,19 @@ docker push <アカウントID>.dkr.ecr.ap-northeast-1.amazonaws.com/ecs-bg-depl
 
 ### 5. ECS リソース構築
 ```bash
+# 最新イメージを使用する場合
 aws cloudformation create-stack \
   --stack-name ecs-bg-deploy-ecs \
   --template-body file://aws/cloudformation/ecs-simple.yaml \
   --parameters ParameterKey=ProjectName,ParameterValue=ecs-bg-deploy \
+  --capabilities CAPABILITY_IAM
+
+# 特定のイメージタグを指定する場合（推奨）
+aws cloudformation create-stack \
+  --stack-name ecs-bg-deploy-ecs \
+  --template-body file://aws/cloudformation/ecs-simple.yaml \
+  --parameters ParameterKey=ProjectName,ParameterValue=ecs-bg-deploy \
+               ParameterKey=ImageTag,ParameterValue=v1.0.0 \
   --capabilities CAPABILITY_IAM
 ```
 

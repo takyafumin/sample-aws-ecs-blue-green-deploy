@@ -102,6 +102,21 @@ aws ecs list-tasks --cluster ecs-bg-deploy-cluster
 aws ecs describe-tasks --cluster ecs-bg-deploy-cluster --tasks <task-arn>
 ```
 
+## ベストプラクティス
+
+### イメージタグ管理
+- **本番環境**: `latest`タグは使用せず、具体的なバージョンタグを使用
+- **タグ例**: `v1.0.0`, `2023-12-01`, `commit-abc123`
+- **ロールバック**: 特定タグで簡単に前バージョンに戻せる
+
+### イメージタグの例
+```bash
+# バージョンタグでビルド
+docker build --platform linux/amd64 -t ecs-bg-deploy-app:v1.0.0 .
+docker tag ecs-bg-deploy-app:v1.0.0 <アカウントID>.dkr.ecr.ap-northeast-1.amazonaws.com/ecs-bg-deploy-app:v1.0.0
+docker push <アカウントID>.dkr.ecr.ap-northeast-1.amazonaws.com/ecs-bg-deploy-app:v1.0.0
+```
+
 ## 制限事項
 
 ### 現在の構成

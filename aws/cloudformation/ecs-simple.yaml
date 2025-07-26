@@ -5,6 +5,10 @@ Parameters:
   ProjectName:
     Type: String
     Default: 'ecs-bg-deploy'
+  ImageTag:
+    Type: String
+    Default: 'latest'
+    Description: 'Container image tag to deploy'
 
 Resources:
   # ECS Cluster
@@ -26,7 +30,7 @@ Resources:
       ExecutionRoleArn: !Ref TaskExecutionRole
       ContainerDefinitions:
         - Name: app
-          Image: !Sub '${AWS::AccountId}.dkr.ecr.${AWS::Region}.amazonaws.com/${ProjectName}-app:latest'
+          Image: !Sub '${AWS::AccountId}.dkr.ecr.${AWS::Region}.amazonaws.com/${ProjectName}-app:${ImageTag}'
           PortMappings:
             - ContainerPort: 80
           LogConfiguration:
