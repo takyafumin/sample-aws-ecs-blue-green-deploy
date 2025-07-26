@@ -2,16 +2,22 @@
 ECS を Blue / Green デプロイするサンプル
 
 ## 概要
-AWS ECS と CodeDeploy を使用した Blue/Green デプロイメント環境の構築サンプルです。
-GitHub Actions を使用してビルドとデプロイを自動化します。
+AWS ECS Fargateを使用したコンテナ実行環境の構築サンプルです。
+現在はシンプルなECSサービスが実装されており、将来的にCodeDeployを使用したBlue/Greenデプロイメント機能を追加予定です。
 
 ## アーキテクチャ
+
+### 現在の実装
 - **VPC**: 10.0.0.0/16
-- **Public Subnets**: 10.0.1.0/24, 10.0.2.0/24
-- **Private Subnets**: 10.0.11.0/24, 10.0.12.0/24
-- **ECS Fargate**: Blue/Green デプロイメント
-- **CodeDeploy**: デプロイメント管理
-- **Application Load Balancer**: トラフィック制御
+- **Public Subnets**: 10.0.1.0/24, 10.0.2.0/24 (ALB配置)
+- **Private Subnets**: 10.0.11.0/24, 10.0.12.0/24 (ECSタスク配置)
+- **ECS Fargate**: シンプルな2タスク構成
+- **Application Load Balancer**: インターネット向けトラフィック制御
+- **ECR**: コンテナイメージ保存
+
+### 将来の拡張予定
+- **CodeDeploy**: Blue/Greenデプロイメント管理
+- **GitHub Actions**: CI/CDパイプライン
 
 ## デプロイ手順
 
@@ -55,13 +61,12 @@ aws cloudformation create-stack \
   --parameters ParameterKey=ProjectName,ParameterValue=ecs-bg-deploy
 ```
 
-### 3. ECS リソース構築
+### 3. ECRリポジトリ構築
 ```bash
 aws cloudformation create-stack \
-  --stack-name ecs-bg-deploy-ecs \
-  --template-body file://aws/cloudformation/ecs.yaml \
-  --parameters ParameterKey=ProjectName,ParameterValue=ecs-bg-deploy \
-  --capabilities CAPABILITY_IAM
+  --stack-name ecs-bg-deploy-ecr \
+  --template-body file://aws/cloudformation/ecr.yaml \
+  --parameters ParameterKey=ProjectName,ParameterValue=ecs-bg-deploy
 ```
 
 ### 4. 初回イメージのプッシュ
@@ -69,18 +74,47 @@ aws cloudformation create-stack \
 # ECRにログイン
 aws ecr get-login-password --region ap-northeast-1 | docker login --username AWS --password-stdin <アカウントID>.dkr.ecr.ap-northeast-1.amazonaws.com
 
-# イメージをビルド・プッシュ
-docker build -t ecs-bg-deploy-app .
+# AMD64プラットフォーム用イメージをビルド・プッシュ
+docker build --platform linux/amd64 -t ecs-bg-deploy-app .
 docker tag ecs-bg-deploy-app:latest <アカウントID>.dkr.ecr.ap-northeast-1.amazonaws.com/ecs-bg-deploy-app:latest
 docker push <アカウントID>.dkr.ecr.ap-northeast-1.amazonaws.com/ecs-bg-deploy-app:latest
 ```
 
-### 5. GitHub Secrets設定
+> **重要:** ECSサービスが起動時にイメージを参照するため、ECSリソース構築前にイメージをプッシュしてください。
+
+### 5. ECS リソース構築
+```bash
+# 最新イメージを使用する場合
+aws cloudformation create-stack \
+  --stack-name ecs-bg-deploy-ecs \
+  --template-body file://aws/cloudformation/ecs-simple.yaml \
+  --parameters ParameterKey=ProjectName,ParameterValue=ecs-bg-deploy \
+  --capabilities CAPABILITY_IAM
+
+# 特定のイメージタグを指定する場合（推奨）
+aws cloudformation create-stack \
+  --stack-name ecs-bg-deploy-ecs \
+  --template-body file://aws/cloudformation/ecs-simple.yaml \
+  --parameters ParameterKey=ProjectName,ParameterValue=ecs-bg-deploy \
+               ParameterKey=ImageTag,ParameterValue=v1.0.0 \
+  --capabilities CAPABILITY_IAM
+```
+
+### 6. 動作確認
+```bash
+# ECSサービスの状態確認
+aws ecs describe-services --cluster ecs-bg-deploy-cluster --services ecs-bg-deploy-service --query 'services[0].{Status:status,RunningCount:runningCount,DesiredCount:desiredCount}'
+
+# ロードバランサーのDNS名取得
+aws cloudformation describe-stacks --stack-name ecs-bg-deploy-ecs --query 'Stacks[0].Outputs[0].OutputValue' --output text
+```
+
+### 7. GitHub Secrets設定（将来のCI/CD用）
 GitHubリポジトリの Settings > Secrets and variables > Actions で以下を設定:
 - `AWS_ROLE_ARN`: 手順1で作成したIAMロールARN
 
-### 6. デプロイ
-mainブランチにプッシュすると自動でBlue/Greenデプロイが実行されます。
+### 8. 次のステップ
+現在はシンプルなECSサービスが稼働中です。Blue/Greenデプロイ機能は今後追加予定です。
 
 ## ディレクトリ構成
 ```
@@ -89,10 +123,15 @@ mainブランチにプッシュすると自動でBlue/Greenデプロイが実行
 │   └── cloudformation/
 │       ├── github-oidc.yaml  # GitHub OIDC設定
 │       ├── network.yaml      # ネットワーク構成
-│       └── ecs.yaml          # ECS関連リソース
+│       ├── ecr.yaml          # ECRリポジトリ
+│       ├── ecs-simple.yaml   # シンプルECSサービス
+│       └── ecs.yaml          # Blue/Green ECSサービス（未完成）
+├── docs/
+│   ├── ecs-setup.md      # ECS構築ガイド
+│   └── oidc-setup.md     # OIDC設定ガイド
 ├── .github/
 │   └── workflows/
-│       └── deploy.yml        # GitHub Actions
+│       └── deploy.yml        # GitHub Actions（未完成）
 ├── Dockerfile                # アプリケーションイメージ
 ├── index.html               # サンプルアプリ
 └── README.md
