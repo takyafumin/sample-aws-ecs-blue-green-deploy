@@ -11,6 +11,8 @@ GitHub ActionsからAWSリソースにアクセスするためのOIDC（OpenID C
 - **Client ID**: `sts.amazonaws.com`
 - **Thumbprint**: `6938fd4d98bab03faadb97b34396831e3780aea1`
 
+> **重要**: Thumbprintは時間の経過とともに変更される可能性があります。最新の値は[GitHubドキュメント](https://docs.github.com/en/actions/deployment/security-hardening-your-deployments/configuring-openid-connect-in-amazon-web-services)または[AWSドキュメント](https://docs.aws.amazon.com/IAM/latest/UserGuide/id_roles_providers_create_oidc_verify-thumbprint.html)で確認してください。
+
 ### 2. IAM Role
 - **リソースタイプ**: `AWS::IAM::Role`
 - **Trust Policy**: GitHub ActionsからのAssumeRoleを許可（全ブランチ対応）
@@ -37,6 +39,12 @@ Provider with url https://token.actions.githubusercontent.com already exists
 ```
 
 **解決方法**: 既存のプロバイダーを使用するため、CloudFormationテンプレートからOIDCプロバイダーリソースを削除し、既存のARNを参照する。
+
+### Thumbprintの確認方法
+現在のThumbprintを確認するコマンド:
+```bash
+echo | openssl s_client -servername token.actions.githubusercontent.com -connect token.actions.githubusercontent.com:443 2>/dev/null | openssl x509 -fingerprint -noout -sha1 | cut -d= -f2 | tr -d :
+```
 
 ### 権限不足エラー
 IAMロールに必要な権限が不足している場合は、[github-oidc.yaml](../aws/cloudformation/github-oidc.yaml)のPoliciesセクションを確認してください。
