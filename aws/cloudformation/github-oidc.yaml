@@ -1,0 +1,75 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'GitHub OIDC Provider and IAM Role for GitHub Actions'
+
+Parameters:
+  GitHubOrg:
+    Type: String
+    Description: GitHub organization or username
+  GitHubRepo:
+    Type: String
+    Description: GitHub repository name
+  ProjectName:
+    Type: String
+    Default: 'ecs-bg-deploy'
+
+Resources:
+  # IAM Role for GitHub Actions
+  GitHubActionsRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub '${ProjectName}-github-actions-role'
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Federated: !Sub 'arn:aws:iam::${AWS::AccountId}:oidc-provider/token.actions.githubusercontent.com'
+            Action: sts:AssumeRoleWithWebIdentity
+            Condition:
+              StringEquals:
+                'token.actions.githubusercontent.com:aud': sts.amazonaws.com
+              StringLike:
+                'token.actions.githubusercontent.com:sub': !Sub 'repo:${GitHubOrg}/${GitHubRepo}:*'
+      Policies:
+        - PolicyName: ECRAndECSAccess
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - ecr:GetAuthorizationToken
+                  - ecr:BatchCheckLayerAvailability
+                  - ecr:GetDownloadUrlForLayer
+                  - ecr:BatchGetImage
+                  - ecr:InitiateLayerUpload
+                  - ecr:UploadLayerPart
+                  - ecr:CompleteLayerUpload
+                  - ecr:PutImage
+                Resource: '*'
+              - Effect: Allow
+                Action:
+                  - ecs:DescribeTaskDefinition
+                  - ecs:RegisterTaskDefinition
+                Resource: '*'
+              - Effect: Allow
+                Action:
+                  - codedeploy:CreateDeployment
+                  - codedeploy:GetApplication
+                  - codedeploy:GetDeployment
+                  - codedeploy:GetDeploymentConfig
+                  - codedeploy:RegisterApplicationRevision
+                Resource: '*'
+              - Effect: Allow
+                Action:
+                  - iam:PassRole
+                Resource: 
+                  - !Sub 'arn:aws:iam::${AWS::AccountId}:role/${ProjectName}-*'
+                  - !Sub 'arn:aws:iam::${AWS::AccountId}:role/ecsTaskExecutionRole'
+                  - !Sub 'arn:aws:iam::${AWS::AccountId}:role/ecsTaskRole'
+
+Outputs:
+  GitHubActionsRoleArn:
+    Description: ARN of the GitHub Actions IAM Role
+    Value: !GetAtt GitHubActionsRole.Arn
+    Export:
+      Name: !Sub '${ProjectName}-GitHubActionsRoleArn'
