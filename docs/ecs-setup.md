@@ -57,7 +57,7 @@ AWS ECS Fargateを使用したシンプルなコンテナ実行環境の構築�
 
 #### 1. イメージプルエラー
 ```
-CannotPullContainerError: image Manifest does not contain descriptor matching platform
+CannotPullContainerError: image manifest does not contain descriptor matching platform
 ```
 **解決方法**: AMD64プラットフォーム指定でビルド
 ```bash
