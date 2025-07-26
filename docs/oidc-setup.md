@@ -15,6 +15,7 @@ GitHub ActionsからAWSリソースにアクセスするためのOIDC（OpenID C
 - **リソースタイプ**: `AWS::IAM::Role`
 - **Trust Policy**: GitHub ActionsからのAssumeRoleを許可（全ブランチ対応）
 - **Permissions**: ECR、ECS、CodeDeployへのアクセス権限
+- **PassRole制限**: プロジェクト関連ロールのみに制限
 - **Branch Pattern**: `repo:${GitHubOrg}/${GitHubRepo}:*` （全ブランチ・PRからのデプロイ可能）
 
 ## CloudFormationテンプレート

@@ -62,7 +62,10 @@ Resources:
               - Effect: Allow
                 Action:
                   - iam:PassRole
-                Resource: '*'
+                Resource: 
+                  - !Sub 'arn:aws:iam::${AWS::AccountId}:role/${ProjectName}-*'
+                  - !Sub 'arn:aws:iam::${AWS::AccountId}:role/ecsTaskExecutionRole'
+                  - !Sub 'arn:aws:iam::${AWS::AccountId}:role/ecsTaskRole'
 
 Outputs:
   GitHubActionsRoleArn:
