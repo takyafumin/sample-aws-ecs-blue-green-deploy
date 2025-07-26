@@ -30,13 +30,13 @@ aws cloudformation create-stack \
   --stack-name ecs-bg-deploy-github-oidc \
   --template-body file://aws/cloudformation/github-oidc.yaml \
   --parameters ParameterKey=ProjectName,ParameterValue=ecs-bg-deploy \
-               ParameterKey=GitHubOrg,ParameterValue=takyafumin \
+               ParameterKey=GitHubOrg,ParameterValue=YOUR_GITHUB_USERNAME \
                ParameterKey=GitHubRepo,ParameterValue=sample-aws-ecs-blue-green-deploy \
   --capabilities CAPABILITY_NAMED_IAM
 ```
 
 > **注意:** 
-> - `GitHubOrg` にはあなたのGitHubユーザー名を指定してください。上記は例です。
+> - `YOUR_GITHUB_USERNAME` をあなたのGitHubユーザー名に置き換えてください。
 > - OIDCプロバイダーが既に存在する場合は、最初のコマンドはスキップしてください。
 
 **IAMロールARNの取得:**
