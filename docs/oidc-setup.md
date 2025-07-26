@@ -13,8 +13,9 @@ GitHub ActionsからAWSリソースにアクセスするためのOIDC（OpenID C
 
 ### 2. IAM Role
 - **リソースタイプ**: `AWS::IAM::Role`
-- **Trust Policy**: GitHub ActionsからのAssumeRoleを許可
+- **Trust Policy**: GitHub ActionsからのAssumeRoleを許可（全ブランチ対応）
 - **Permissions**: ECR、ECS、CodeDeployへのアクセス権限
+- **Branch Pattern**: `repo:${GitHubOrg}/${GitHubRepo}:*` （全ブランチ・PRからのデプロイ可能）
 
 ## CloudFormationテンプレート
 [aws/cloudformation/github-oidc.yaml](../aws/cloudformation/github-oidc.yaml)
