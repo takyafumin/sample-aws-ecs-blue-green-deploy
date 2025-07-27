@@ -3,13 +3,12 @@ name: Blue/Green Deploy
 on:
   push:
     tags: ['v*']
-    branches: ['main', 'develop', 'feature/*']
   workflow_dispatch:
     inputs:
       version:
         description: 'Version tag'
         required: true
-        default: 'branch-test'
+        default: 'manual-deploy'
 
 env:
   PROJECT_NAME: ecs-bg-deploy

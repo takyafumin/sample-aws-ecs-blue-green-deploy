@@ -113,21 +113,26 @@ vim index.html
 
 ### GitHub Actionsでのデプロイ
 
-#### 自動デプロイ
+#### タグプッシュでの自動デプロイ
 ```bash
-# タグプッシュで自動実行
+# vで始まるタグプッシュで自動実行
 git tag v2.0.0
 git push origin v2.0.0
 ```
 
 #### 手動実行
-- GitHub > Actions > "Blue/Green Deploy" > "Run workflow"
-- バージョンを入力して実行
+```bash
+# GitHub > Actions > "Blue/Green Deploy" > "Run workflow"
+# バージョンを入力して実行
+```
+
+> **注意**: 通常のブランチプッシュでは自動実行されません
 
 ## ドキュメント
 
 - **[Blue/Greenデプロイ手順](docs/blue-green-deploy.md)**: デプロイの実行方法
 - **[スクリプト責務設計](docs/scripts-responsibility.md)**: 各スクリプトの役割と使い分け
+- **[GitHub Actionsガイド](docs/github-actions-guide.md)**: CI/CD設定とトラブルシューティング
 
 ## ディレクトリ構成
 ```
@@ -135,7 +140,8 @@ git push origin v2.0.0
 ├── aws/cloudformation/     # CloudFormationテンプレート
 ├── docs/                   # ドキュメント
 │   ├── blue-green-deploy.md
-│   └── scripts-responsibility.md
+│   ├── scripts-responsibility.md
+│   └── github-actions-guide.md
 ├── scripts/               # デプロイスクリプト
 │   ├── build.sh           # イメージビルド・プッシュ
 │   ├── deploy.sh          # Blue/Greenデプロイ
