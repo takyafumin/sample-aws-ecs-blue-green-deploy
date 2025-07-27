@@ -61,6 +61,17 @@ Resources:
                 Resource: '*'
               - Effect: Allow
                 Action:
+                  - cloudformation:DescribeStacks
+                  - cloudformation:GetTemplate
+                  - cloudformation:ListStackResources
+                Resource: !Sub 'arn:aws:cloudformation:${AWS::Region}:${AWS::AccountId}:stack/${ProjectName}-*/*'
+              - Effect: Allow
+                Action:
+                  - elbv2:DescribeLoadBalancers
+                  - elbv2:DescribeTargetGroups
+                Resource: '*'
+              - Effect: Allow
+                Action:
                   - iam:PassRole
                   - iam:ListRoles
                   - iam:GetRole
