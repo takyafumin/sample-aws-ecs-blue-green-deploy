@@ -1,101 +1,40 @@
 # Blue/Greenデプロイメント手順
 
 ## 前提条件
-- ネットワーク、ECR、既存ECSサービスが構築済み
-- 新しいコンテナイメージがECRにプッシュ済み
+- ネットワーク、ECR、Blue/Green ECSサービスが構築済み
+- ソースコードの変更が完了済み
 
-## 1. 既存環境からBlue/Green環境への移行
+## デプロイ手順
 
-### 既存スタックの削除
-```bash
-aws cloudformation delete-stack --stack-name ecs-bg-deploy-ecs
-```
+### ユースケース別デプロイ手順
 
-### Blue/Green環境の構築
-```bash
-aws cloudformation create-stack \
-  --stack-name ecs-bg-deploy-bluegreen \
-  --template-body file://aws/cloudformation/ecs-bluegreen.yaml \
-  --parameters ParameterKey=ProjectName,ParameterValue=ecs-bg-deploy \
-               ParameterKey=ImageTag,ParameterValue=latest \
-  --capabilities CAPABILITY_IAM
-```
+| ユースケース | 対象者 | 手順 | コマンド | 所要時間 |
+|-------------|--------|------|----------|----------|
+| **ソース修正後デプロイ** | 開発者 | 1. ソース修正<br>2. 統合デプロイ実行 | `vim index.html`<br>`./scripts/dev-deploy.sh v2.0.0` | 約7分 |
+| **既存イメージでデプロイ** | 運用者 | 1. デプロイのみ実行 | `./scripts/deploy.sh v2.0.0` | 約5分 |
+| **自動デプロイ** | CI/CD | 1. タグプッシュ | `git tag v2.0.0`<br>`git push origin v2.0.0` | 約7分 |
+| **ビルドのみ** | 開発者 | 1. イメージ作成のみ | `./scripts/build.sh v2.0.0` | 約2分 |
 
-## 2. 新バージョンのデプロイ
+### 検証・テスト手順
 
-### 新しいタスク定義の作成
-```bash
-# 新しいイメージタグでタスク定義を更新
-aws ecs register-task-definition \
-  --family ecs-bg-deploy-task \
-  --network-mode awsvpc \
-  --requires-compatibilities FARGATE \
-  --cpu 256 \
-  --memory 512 \
-  --execution-role-arn arn:aws:iam::<ACCOUNT_ID>:role/ecs-bg-deploy-TaskExecutionRole-* \
-  --container-definitions '[
-    {
-      "name": "app",
-      "image": "<ACCOUNT_ID>.dkr.ecr.ap-northeast-1.amazonaws.com/ecs-bg-deploy-app:v2.0.0",
-      "portMappings": [{"containerPort": 80}],
-      "logConfiguration": {
-        "logDriver": "awslogs",
-        "options": {
-          "awslogs-group": "/ecs/ecs-bg-deploy",
-          "awslogs-region": "ap-northeast-1",
-          "awslogs-stream-prefix": "ecs"
-        }
-      }
-    }
-  ]'
-```
+| 検証タイプ | 目的 | コマンド | 実行タイミング |
+|-----------|------|----------|----------------|
+| **事前検証** | 前提条件・リソース状態確認 | `./test/verify.sh` | デプロイ前 |
+| **統合テスト** | 実際のデプロイ動作テスト | `./test/test-deploy.sh` | 開発時 |
 
-### CodeDeployでのデプロイ実行
-```bash
-aws deploy create-deployment \
-  --application-name ecs-bg-deploy-app \
-  --deployment-group-name ecs-bg-deploy-dg \
-  --revision revisionType=AppSpecContent,appSpecContent='{
-    "version": 0.0,
-    "Resources": [{
-      "TargetService": {
-        "Type": "AWS::ECS::Service",
-        "Properties": {
-          "TaskDefinition": "arn:aws:ecs:ap-northeast-1:<ACCOUNT_ID>:task-definition/ecs-bg-deploy-task:<REVISION>",
-          "LoadBalancerInfo": {
-            "ContainerName": "app",
-            "ContainerPort": 80
-          }
-        }
-      }
-    }]
-  }'
-```
+### 監視・運用手順
 
-## 3. デプロイメント監視
+| 操作 | 目的 | コマンド | 使用場面 |
+|------|------|----------|----------|
+| **デプロイ状況確認** | 進行状況監視 | `aws deploy get-deployment --deployment-id <ID>` | デプロイ中 |
+| **ECSサービス確認** | サービス状態確認 | `aws ecs describe-services --cluster ecs-bg-deploy-cluster --services ecs-bg-deploy-service` | 運用時 |
+| **手動ロールバック** | 緊急時復旧 | `aws deploy stop-deployment --deployment-id <ID> --auto-rollback-enabled` | 障害時 |
 
-### デプロイメント状況の確認
-```bash
-aws deploy get-deployment --deployment-id <DEPLOYMENT_ID>
-```
+## 重要事項
 
-### ECSサービスの状況確認
-```bash
-aws ecs describe-services \
-  --cluster ecs-bg-deploy-cluster \
-  --services ecs-bg-deploy-service
-```
-
-## 4. ロールバック
-
-### 手動ロールバック
-```bash
-aws deploy stop-deployment \
-  --deployment-id <DEPLOYMENT_ID> \
-  --auto-rollback-enabled
-```
-
-## 注意事項
-- デプロイ中は一時的にリソース使用量が2倍になります
-- Blue環境は成功後5分で自動終了されます
-- 失敗時は自動ロールバックが実行されます
+| 項目 | 内容 | 影響 |
+|------|------|------|
+| **リソース使用量** | デプロイ中は一時的に2倍 | コスト増加（約5分間） |
+| **Blue環境** | 成功後5分で自動終了 | 自動クリーンアップ |
+| **失敗時対応** | 自動ロールバック実行 | サービス継続性確保 |
+| **デプロイ時間** | 約5-7分 | サービス無停止 |
