@@ -131,6 +131,7 @@ git push origin v2.0.0
 ## ドキュメント
 
 - **[Blue/Greenデプロイ手順](docs/blue-green-deploy.md)**: デプロイの実行方法
+- **[CodeDeployガイド](docs/codedeploy-guide.md)**: CodeDeployの構成と動作詳細
 - **[スクリプト責務設計](docs/scripts-responsibility.md)**: 各スクリプトの役割と使い分け
 - **[GitHub Actionsガイド](docs/github-actions-guide.md)**: CI/CD設定とトラブルシューティング
 
