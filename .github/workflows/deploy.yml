@@ -3,6 +3,7 @@ name: Blue/Green Deploy
 on:
   push:
     tags: ['v*']
+    branches: ['main', 'feature/*', 'develop']  # 一時的に追加
   workflow_dispatch:
     inputs:
       version:
