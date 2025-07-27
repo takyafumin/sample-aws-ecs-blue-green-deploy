@@ -125,17 +125,17 @@ DeploymentType: BLUE_GREEN
 ```
 
 #### トラフィック制御
-- **本番トラフィック**: ALBListener（:80） → TargetGroup1（Blue）
-- **テストトラフィック**: TestListener（:8080） → デプロイ時のみTargetGroup2（Green）、通常時は503エラー
+- **本番トラフィック**: ALBListener（:80） → TargetGroup1（Blue/Green切り替え）
+- **テストトラフィック**: TestListener（:8080） → TargetGroup2（デプロイ後もGreenタスク継続）
 
-> **注意**: TestListener（:8080）は通常時は503エラーを返し、Blue/Greenデプロイメント実行中のみ新しいバージョン（Green）にアクセス可能になります。これにより本番環境での混乱を防ぎます。
+> **注意**: TestListener（:8080）は通常時は503エラー（TargetGroup2が空のため）を返し、Blue/Greenデプロイメント完了後は新しいバージョン（Green）に継続的にアクセス可能になります。これにより開発・テスト用途で最新バージョンを確認できます。
 
 #### Blue/Greenデプロイメントフロー
-1. **通常状態**: 80番ポート（本番）のみ有効、8080番ポートは503エラー
+1. **通常状態**: 80番ポート（本番）のみ有効、8080番ポートは503エラー（TargetGroup2が空）
 2. **デプロイ開始**: CodeDeployが新しいタスクセット（Green）をTargetGroup2に登録
-3. **テスト期間**: 8080番ポートから新バージョンにアクセス可能
-4. **トラフィック切り替え**: 80番ポートのトラフィックがGreenに切り替わる
-5. **デプロイ完了**: 古いタスクセット（Blue）が削除され、8080番ポートは再び503エラーに戻る
+3. **テスト期間**: 8080番ポートから新バージョン（Green）にアクセス可能
+4. **トラフィック切り替え**: 80番ポートのトラフィックがGreenに切り替わる（TargetGroup1とTargetGroup2が入れ替わる）
+5. **デプロイ完了**: 古いタスクセット（Blue）が削除、8080番ポートは新バージョンに継続アクセス可能
 
 #### 自動ロールバック設定
 - デプロイ失敗時に自動ロールバック
@@ -145,7 +145,7 @@ DeploymentType: BLUE_GREEN
 
 #### 出力値
 - `LoadBalancerDNS`: ALBのDNS名
-- `TestEndpoint`: テスト環境のURL（デプロイメント中のみ有効、通常時は503）
+- `TestEndpoint`: テスト環境のURL（デプロイ完了後も最新バージョンにアクセス可能）
 - `CodeDeployApplication`: CodeDeployアプリケーション名
 - `CodeDeployDeploymentGroup`: デプロイメントグループ名
 

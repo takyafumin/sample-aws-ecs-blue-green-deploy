@@ -145,11 +145,8 @@ Resources:
     Type: AWS::ElasticLoadBalancingV2::Listener
     Properties:
       DefaultActions:
-        - Type: fixed-response
-          FixedResponseConfig:
-            StatusCode: 503
-            ContentType: text/plain
-            MessageBody: 'Service Unavailable - No deployment in progress'
+        - Type: forward
+          TargetGroupArn: !Ref TargetGroup2
       LoadBalancerArn: !Ref ApplicationLoadBalancer
       Port: 8080
       Protocol: HTTP
@@ -214,7 +211,7 @@ Resources:
       BlueGreenDeploymentConfiguration:
         TerminateBlueInstancesOnDeploymentSuccess:
           Action: TERMINATE
-          TerminationWaitTimeInMinutes: 1
+          TerminationWaitTimeInMinutes: 3
         DeploymentReadyOption:
           ActionOnTimeout: STOP_DEPLOYMENT
           WaitTimeInMinutes: 10
@@ -258,7 +255,7 @@ Outputs:
       Name: !Sub '${ProjectName}-CodeDeployDeploymentGroup'
   
   TestEndpoint:
-    Description: Test Endpoint (Active only during Blue/Green deployments)
+    Description: Test Endpoint (Provides access to latest version after deployment)
     Value: !Sub 'http://${ApplicationLoadBalancer.DNSName}:8080'
     Export:
       Name: !Sub '${ProjectName}-TestEndpoint'
