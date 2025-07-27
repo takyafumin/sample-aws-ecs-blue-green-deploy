@@ -1,0 +1,49 @@
+name: Blue/Green Deploy
+
+on:
+  push:
+    tags: ['v*']
+    branches: ['main', 'feature/*', 'develop']  # 一時的に追加
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version tag'
+        required: true
+        default: 'manual-deploy'
+
+env:
+  PROJECT_NAME: ecs-bg-deploy
+  AWS_REGION: ap-northeast-1
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v4
+      with:
+        role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+        aws-region: ${{ env.AWS_REGION }}
+    
+    - name: Set version
+      id: version
+      run: |
+        if [ "${{ github.event_name }}" = "push" ] && [[ "${{ github.ref }}" == refs/tags/* ]]; then
+          echo "version=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+        elif [ "${{ github.event_name }}" = "push" ]; then
+          echo "version=branch-${GITHUB_REF#refs/heads/}-$(date +%s)" >> $GITHUB_OUTPUT
+        else
+          echo "version=${{ github.event.inputs.version }}" >> $GITHUB_OUTPUT
+        fi
+    
+    - name: Build and push
+      run: ./scripts/build.sh ${{ steps.version.outputs.version }}
+    
+    - name: Deploy
+      run: ./scripts/deploy.sh ${{ steps.version.outputs.version }}
