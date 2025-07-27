@@ -1,9 +1,19 @@
 # CloudFormationテンプレート詳細ガイド
 
 ## 概要
-このプロジェクトでは、AWS環境を段階的に構築するために複数のCloudFormationテンプレートを使用しています。
+このプロジェクトでは、Blue/Green ECS環境を構築するために4つのCloudFormationテンプレートを使用しています。
 
-## テンプレート一覧
+## テンプレート構成
+
+```
+aws/cloudformation/
+├── network.yaml        # 基盤: VPC・サブネット・IGW
+├── ecr.yaml           # 基盤: ECRリポジトリ
+├── github-oidc.yaml   # 基盤: CI/CD用OIDC認証
+└── ecs-bluegreen.yaml # メイン: Blue/Green ECS環境
+```
+
+## テンプレート詳細
 
 ### 1. network.yaml - ネットワーク基盤
 **目的**: VPC、サブネット、ルーティングの構築
@@ -81,33 +91,67 @@
 
 ---
 
-### 4. ecs-simple.yaml - シンプルECS構成
-**目的**: 基本的なECSサービスの構築（Blue/Green未対応）
+### 4. ecs-bluegreen.yaml - Blue/Green ECS環境（メイン）
+**目的**: 完全なBlue/Green デプロイメント環境の構築
 
 #### 主要リソース
-| リソース | タイプ | 説明 |
-|----------|--------|------|
-| ECSCluster | AWS::ECS::Cluster | Fargateクラスター |
-| TaskDefinition | AWS::ECS::TaskDefinition | コンテナ定義 |
-| ECSService | AWS::ECS::Service | サービス定義（2タスク） |
-| ApplicationLoadBalancer | AWS::ElasticLoadBalancingV2::LoadBalancer | ロードバランサー |
-| TargetGroup | AWS::ElasticLoadBalancingV2::TargetGroup | ターゲットグループ |
-| ALBListener | AWS::ElasticLoadBalancingV2::Listener | リスナー設定 |
-| TaskExecutionRole | AWS::IAM::Role | タスク実行ロール |
-| LogGroup | AWS::Logs::LogGroup | CloudWatch Logs |
-| SecurityGroup | AWS::EC2::SecurityGroup | セキュリティグループ |
+| カテゴリ | リソース | タイプ | 説明 |
+|----------|----------|--------|------|
+| **ECS** | ECSCluster | AWS::ECS::Cluster | Fargateクラスター |
+| | TaskDefinition | AWS::ECS::TaskDefinition | コンテナ定義 |
+| | ECSService | AWS::ECS::Service | CodeDeploy制御のサービス |
+| | TaskExecutionRole | AWS::IAM::Role | タスク実行ロール |
+| **ALB** | ApplicationLoadBalancer | AWS::ElasticLoadBalancingV2::LoadBalancer | ロードバランサー |
+| | TargetGroup1 | AWS::ElasticLoadBalancingV2::TargetGroup | Blue環境用 |
+| | TargetGroup2 | AWS::ElasticLoadBalancingV2::TargetGroup | Green環境用 |
+| | ALBListener | AWS::ElasticLoadBalancingV2::Listener | 本番トラフィック（:80） |
+| | TestListener | AWS::ElasticLoadBalancingV2::Listener | テストトラフィック（:8080） |
+| **CodeDeploy** | CodeDeployApplication | AWS::CodeDeploy::Application | デプロイアプリケーション |
+| | CodeDeployDeploymentGroup | AWS::CodeDeploy::DeploymentGroup | デプロイグループ |
+| | CodeDeployServiceRole | AWS::IAM::Role | CodeDeploy実行ロール |
+| **セキュリティ** | ALBSecurityGroup | AWS::EC2::SecurityGroup | ALB用 |
+| | ECSSecurityGroup | AWS::EC2::SecurityGroup | ECS用 |
+| **監視** | LogGroup | AWS::Logs::LogGroup | CloudWatch Logs |
 
 #### パラメータ
 - `ProjectName`: プロジェクト名（デフォルト: ecs-bg-deploy）
-- `ImageTag`: コンテナイメージタグ（デフォルト: latest）
+- `ImageTag`: コンテナイメージタグ（デフォルト: v1.0.0）
 
-#### タスク定義設定
+#### Blue/Green設定
 ```yaml
-CPU: 256
-Memory: 512
-NetworkMode: awsvpc
-LaunchType: FARGATE
-ContainerPort: 80
+DeploymentController: CODE_DEPLOY
+DeploymentConfigName: CodeDeployDefault.ECSAllAtOnce
+DeploymentType: BLUE_GREEN
+```
+
+#### トラフィック制御
+- **本番トラフィック**: ALBListener（:80） → TargetGroup1（Blue/Green切り替え）
+- **テストトラフィック**: TestListener（:8080） → TargetGroup2（デプロイ後もGreenタスク継続）
+
+> **注意**: TestListener（:8080）は通常時は503エラー（TargetGroup2が空のため）を返し、Blue/Greenデプロイメント完了後は新しいバージョン（Green）に継続的にアクセス可能になります。これにより開発・テスト用途で最新バージョンを確認できます。
+
+#### Blue/Greenデプロイメントフロー
+1. **通常状態**: 80番ポート（本番）のみ有効、8080番ポートは503エラー（TargetGroup2が空）
+2. **デプロイ開始**: CodeDeployが新しいタスクセット（Green）をTargetGroup2に登録
+3. **テスト期間**: 8080番ポートから新バージョン（Green）にアクセス可能
+4. **トラフィック切り替え**: 80番ポートのトラフィックがGreenに切り替わる（TargetGroup1とTargetGroup2が入れ替わる）
+5. **デプロイ完了**: 古いタスクセット（Blue）が削除、8080番ポートは新バージョンに継続アクセス可能
+
+#### 自動ロールバック設定
+- デプロイ失敗時に自動ロールバック
+- CloudWatchアラーム検知時に自動ロールバック
+- 手動停止時に自動ロールバック
+- Blue環境終了待ち時間: 1分（短縮設定）
+
+#### 出力値
+- `LoadBalancerDNS`: ALBのDNS名
+- `TestEndpoint`: テスト環境のURL（デプロイ完了後も最新バージョンにアクセス可能）
+- `CodeDeployApplication`: CodeDeployアプリケーション名
+- `CodeDeployDeploymentGroup`: デプロイメントグループ名
+
+#### 依存関係
+- network.yaml（VPC、サブネット）
+- ecr.yaml（コンテナイメージ）
 ```
 
 #### 出力値
@@ -164,26 +208,37 @@ AutoRollback: 有効（失敗時、アラーム時）
 ### 初期構築
 ```bash
 # 1. ネットワーク基盤
-aws cloudformation create-stack --stack-name ecs-bg-deploy-network --template-body file://aws/cloudformation/network.yaml
+aws cloudformation create-stack \
+  --stack-name ecs-bg-deploy-network \
+  --template-body file://aws/cloudformation/network.yaml \
+  --parameters ParameterKey=ProjectName,ParameterValue=ecs-bg-deploy
 
 # 2. ECRリポジトリ
-aws cloudformation create-stack --stack-name ecs-bg-deploy-ecr --template-body file://aws/cloudformation/ecr.yaml
+aws cloudformation create-stack \
+  --stack-name ecs-bg-deploy-ecr \
+  --template-body file://aws/cloudformation/ecr.yaml \
+  --parameters ParameterKey=ProjectName,ParameterValue=ecs-bg-deploy
 
 # 3. GitHub OIDC（CI/CD用）
-aws cloudformation create-stack --stack-name ecs-bg-deploy-github-oidc --template-body file://aws/cloudformation/github-oidc.yaml
+aws cloudformation create-stack \
+  --stack-name ecs-bg-deploy-github-oidc \
+  --template-body file://aws/cloudformation/github-oidc.yaml \
+  --parameters ParameterKey=ProjectName,ParameterValue=ecs-bg-deploy \
+               ParameterKey=GitHubOrg,ParameterValue=YOUR_USERNAME \
+               ParameterKey=GitHubRepo,ParameterValue=sample-aws-ecs-blue-green-deploy \
+  --capabilities CAPABILITY_NAMED_IAM
 
 # 4. コンテナイメージプッシュ
-docker build --platform linux/amd64 -t ecs-bg-deploy-app .
-# ECRプッシュ処理...
+./scripts/build.sh v1.0.0
 
-# 5. ECSサービス（シンプル構成）
-aws cloudformation create-stack --stack-name ecs-bg-deploy-ecs --template-body file://aws/cloudformation/ecs-simple.yaml
+# 5. Blue/Green ECS環境
+aws cloudformation create-stack \
+  --stack-name ecs-bg-deploy-bluegreen \
+  --template-body file://aws/cloudformation/ecs-bluegreen.yaml \
+  --parameters ParameterKey=ProjectName,ParameterValue=ecs-bg-deploy \
+               ParameterKey=ImageTag,ParameterValue=v1.0.0 \
+  --capabilities CAPABILITY_IAM
 ```
-
-### Blue/Green移行
-```bash
-# 1. 既存サービス削除
-aws cloudformation delete-stack --stack-name ecs-bg-deploy-ecs
 
 # 2. Blue/Green構成作成
 aws cloudformation create-stack --stack-name ecs-bg-deploy-bluegreen --template-body file://aws/cloudformation/ecs-bluegreen.yaml
@@ -193,26 +248,37 @@ aws cloudformation create-stack --stack-name ecs-bg-deploy-bluegreen --template-
 
 ### よくあるエラー
 
+### Blue/Greenデプロイの実行
+```bash
+# 新しいバージョンのデプロイ
+./scripts/deploy.sh v2.0.0
+
+# または統合スクリプト（ビルド＋デプロイ）
+./scripts/dev-deploy.sh v2.0.0
+```
+
+## トラブルシューティング
+
 #### 1. スタック間依存関係エラー
 ```
 Export ecs-bg-deploy-VPC cannot be deleted as it is in use
 ```
-**原因**: 他のスタックが出力値を参照している
+**原因**: 他のスタックが出力値を参照している  
 **解決**: 依存するスタックを先に削除
 
-#### 2. イメージプルエラー
+#### 2. DeploymentConfigエラー
+```
+No deployment configuration found for name: CodeDeployDefault.ECSAllAtOnceBlueGreen
+```
+**原因**: 存在しないCodeDeploy設定名を指定  
+**解決**: `CodeDeployDefault.ECSAllAtOnce` に修正
+
+#### 3. イメージプルエラー
 ```
 CannotPullContainerError: image manifest does not contain descriptor
 ```
-**原因**: ECRにイメージが存在しない、またはプラットフォーム不一致
-**解決**: AMD64プラットフォームでビルド・プッシュ
-
-#### 3. セキュリティグループ削除エラー
-```
-DependencyViolation: resource has a dependent object
-```
-**原因**: ENIがアタッチされたまま
-**解決**: ECSタスク停止後に削除
+**原因**: ECRにイメージが存在しない、またはプラットフォーム不一致  
+**解決**: `--platform linux/amd64` でビルド・プッシュ
 
 ### デバッグコマンド
 
@@ -222,25 +288,52 @@ aws cloudformation describe-stacks --stack-name <stack-name>
 aws cloudformation describe-stack-events --stack-name <stack-name>
 ```
 
-#### リソース確認
+#### ECS・CodeDeploy確認
 ```bash
 # ECSサービス状態
 aws ecs describe-services --cluster ecs-bg-deploy-cluster --services ecs-bg-deploy-service
+
+# CodeDeployアプリケーション・デプロイメントグループ確認
+aws deploy list-applications
+aws deploy list-deployment-groups --application-name ecs-bg-deploy-app
+
+# デプロイメント履歴
+aws deploy list-deployments \
+  --application-name ecs-bg-deploy-app \
+  --deployment-group-name ecs-bg-deploy-dg
+
+# 最新デプロイ状況
+aws deploy get-deployment --deployment-id <deployment-id> \
+  --query 'deploymentInfo.{Status:status,CreatedTime:createTime,CompleteTime:completeTime}'
+
+# リアルタイム監視
+watch -n 5 'aws deploy get-deployment --deployment-id <deployment-id> --query "deploymentInfo.status" --output text'
 
 # ALBターゲット状態
 aws elbv2 describe-target-health --target-group-arn <target-group-arn>
 ```
 
+#### CodeDeployコンソール
+AWS Management Console → CodeDeploy → Applications → `ecs-bg-deploy-app`  
+https://console.aws.amazon.com/codesuite/codedeploy/applications
+
 ## ベストプラクティス
 
-### パラメータ管理
-- 環境ごとにパラメータファイルを作成
-- 機密情報はSystems Manager Parameter Storeを使用
+### 環境管理
+- パラメータファイルで環境ごとの設定を分離
+- タグを活用したリソース管理
+- Cost Explorerでコスト監視
 
-### タグ戦略
+### セキュリティ
 ```yaml
-Tags:
-  - Key: Environment
+# 最小権限の原則
+SecurityGroups:
+  - SourceSecurityGroupId: !Ref ALBSecurityGroup  # IP直接指定を避ける
+
+# ログ保持期間設定
+LogGroup:
+  RetentionInDays: 7  # 適切な期間設定
+```
     Value: !Ref Environment
   - Key: Project
     Value: !Ref ProjectName

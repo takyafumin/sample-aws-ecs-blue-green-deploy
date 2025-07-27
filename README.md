@@ -130,18 +130,26 @@ git push origin v2.0.0
 
 ## ドキュメント
 
+- **[クイックスタート](docs/quick-start.md)**: 最短での環境構築手順
 - **[Blue/Greenデプロイ手順](docs/blue-green-deploy.md)**: デプロイの実行方法
-- **[スクリプト責務設計](docs/scripts-responsibility.md)**: 各スクリプトの役割と使い分け
+- **[CloudFormationガイド](docs/cloudformation-guide.md)**: インフラ構成の詳細
 - **[GitHub Actionsガイド](docs/github-actions-guide.md)**: CI/CD設定とトラブルシューティング
+- **[スクリプト責務設計](docs/scripts-responsibility.md)**: 各スクリプトの役割と使い分け
 
 ## ディレクトリ構成
 ```
 .
 ├── aws/cloudformation/     # CloudFormationテンプレート
+│   ├── network.yaml        # VPC・サブネット・IGW
+│   ├── ecr.yaml           # ECRリポジトリ
+│   ├── ecs-bluegreen.yaml # Blue/Green環境（メイン）
+│   └── github-oidc.yaml   # CI/CD用OIDC認証
 ├── docs/                   # ドキュメント
+│   ├── quick-start.md
 │   ├── blue-green-deploy.md
-│   ├── scripts-responsibility.md
-│   └── github-actions-guide.md
+│   ├── cloudformation-guide.md
+│   ├── github-actions-guide.md
+│   └── scripts-responsibility.md
 ├── scripts/               # デプロイスクリプト
 │   ├── build.sh           # イメージビルド・プッシュ
 │   ├── deploy.sh          # Blue/Greenデプロイ

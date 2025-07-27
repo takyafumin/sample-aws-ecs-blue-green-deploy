@@ -85,24 +85,26 @@ docker tag ecs-bg-deploy-app:latest \
 docker push <アカウントID>.dkr.ecr.ap-northeast-1.amazonaws.com/ecs-bg-deploy-app:latest
 ```
 
-## Phase 2: シンプルECS環境構築
+## Phase 2: Blue/Green ECS環境構築
 
-### 5. ECSサービス作成
+### 5. Blue/Green環境作成
 ```bash
 aws cloudformation create-stack \
-  --stack-name ecs-bg-deploy-ecs \
-  --template-body file://aws/cloudformation/ecs-simple.yaml \
+  --stack-name ecs-bg-deploy-bluegreen \
+  --template-body file://aws/cloudformation/ecs-bluegreen.yaml \
   --parameters ParameterKey=ProjectName,ParameterValue=ecs-bg-deploy \
-               ParameterKey=ImageTag,ParameterValue=latest \
+               ParameterKey=ImageTag,ParameterValue=v1.0.0 \
   --capabilities CAPABILITY_IAM
 ```
 
 **作成されるリソース**:
 - ECSクラスター
 - タスク定義
-- ECSサービス（2タスク）
+- ECSサービス（Blue/Green対応）
 - Application Load Balancer
-- ターゲットグループ
+- ターゲットグループ × 2（Blue/Green用）
+- ALBリスナー × 2（本番:80、テスト:8080）
+- CodeDeployアプリケーション・デプロイメントグループ
 - セキュリティグループ
 
 ### 6. 動作確認

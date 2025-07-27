@@ -18,7 +18,7 @@
 - IAM: ロール作成権限
 - VPC: フルアクセス
 
-## 5ステップで構築
+## 6ステップで構築
 
 ### 1. ネットワーク基盤構築
 ```bash
@@ -38,7 +38,22 @@ aws cloudformation create-stack \
   --parameters ParameterKey=ProjectName,ParameterValue=ecs-bg-deploy
 ```
 
-### 3. コンテナイメージプッシュ
+### 3. GitHub OIDC設定（GitHub Actions使用時）
+GitHub Actionsからデプロイする場合は、OIDC認証を設定：
+
+```bash
+aws cloudformation create-stack \
+  --stack-name ecs-bg-deploy-github-oidc \
+  --template-body file://aws/cloudformation/github-oidc.yaml \
+  --parameters ParameterKey=ProjectName,ParameterValue=ecs-bg-deploy \
+               ParameterKey=GitHubOrg,ParameterValue=<あなたのGitHubユーザー名またはOrg> \
+               ParameterKey=GitHubRepo,ParameterValue=<リポジトリ名> \
+  --capabilities CAPABILITY_NAMED_IAM
+```
+
+**注意**: 手動デプロイのみの場合はこのステップをスキップ可能
+
+### 4. コンテナイメージプッシュ
 
 #### ECRログイン
 ```bash
@@ -56,7 +71,7 @@ docker tag ecs-bg-deploy-app:latest <アカウントID>.dkr.ecr.ap-northeast-1.a
 docker push <アカウントID>.dkr.ecr.ap-northeast-1.amazonaws.com/ecs-bg-deploy-app:latest
 ```
 
-### 4. Blue/Green ECS環境構築
+### 5. Blue/Green ECS環境構築
 ```bash
 aws cloudformation create-stack \
   --stack-name ecs-bg-deploy-bluegreen \
@@ -68,7 +83,7 @@ aws cloudformation create-stack \
 
 **作成されるリソース**: ECSクラスター、ALB、CodeDeployアプリケーション、セキュリティグループ
 
-### 5. 動作確認
+### 6. 動作確認
 
 #### ALB DNS名取得
 ```bash
@@ -169,6 +184,9 @@ CloudWatchアラートやダッシュボードの設定については、[シス
 ```bash
 # Blue/Green環境削除
 aws cloudformation delete-stack --stack-name ecs-bg-deploy-bluegreen
+
+# GitHub OIDC削除（設定していた場合）
+aws cloudformation delete-stack --stack-name ecs-bg-deploy-github-oidc
 
 # ECR削除（イメージも削除される）
 aws cloudformation delete-stack --stack-name ecs-bg-deploy-ecr

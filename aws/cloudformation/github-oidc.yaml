@@ -58,6 +58,21 @@ Resources:
                   - codedeploy:GetDeployment
                   - codedeploy:GetDeploymentConfig
                   - codedeploy:RegisterApplicationRevision
+                  - codedeploy:GetDeploymentGroup
+                  - codedeploy:ListDeployments
+                Resource: '*'
+              - Effect: Allow
+                Action:
+                  - cloudformation:DescribeStacks
+                  - cloudformation:GetTemplate
+                  - cloudformation:ListStackResources
+                Resource: !Sub 'arn:aws:cloudformation:${AWS::Region}:${AWS::AccountId}:stack/${ProjectName}-*/*'
+              - Effect: Allow
+                Action:
+                  - elbv2:DescribeLoadBalancers
+                  - elbv2:DescribeTargetGroups
+                  - elasticloadbalancing:DescribeLoadBalancers
+                  - elasticloadbalancing:DescribeTargetGroups
                 Resource: '*'
               - Effect: Allow
                 Action:
