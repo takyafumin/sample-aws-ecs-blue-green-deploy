@@ -34,25 +34,117 @@ graph LR
 - **ECS Fargate**: CPU 256, Memory 512MB × 2タスク
 - **CodeDeploy**: Blue/Green無停止デプロイメント
 
-## クイックスタート
+## ユースケース別手順
 
-**[クイックスタートガイド](docs/quick-start.md)** で5ステップの簡単構築手順を確認できます。
+### 初期構築（インフラ構築）
+
+#### 1. AWSリソース構築
+```bash
+# ネットワーク
+aws cloudformation create-stack \
+  --stack-name ecs-bg-deploy-network \
+  --template-body file://aws/cloudformation/network.yaml \
+  --parameters ParameterKey=ProjectName,ParameterValue=ecs-bg-deploy
+
+# ECRリポジトリ
+aws cloudformation create-stack \
+  --stack-name ecs-bg-deploy-ecr \
+  --template-body file://aws/cloudformation/ecr.yaml \
+  --parameters ParameterKey=ProjectName,ParameterValue=ecs-bg-deploy
+
+# 初回イメージプッシュ
+./scripts/build.sh v1.0.0
+
+# Blue/Green環境構築
+aws cloudformation create-stack \
+  --stack-name ecs-bg-deploy-bluegreen \
+  --template-body file://aws/cloudformation/ecs-bluegreen.yaml \
+  --parameters ParameterKey=ProjectName,ParameterValue=ecs-bg-deploy \
+               ParameterKey=ImageTag,ParameterValue=v1.0.0 \
+  --capabilities CAPABILITY_IAM
+```
+
+#### 2. GitHub Actions用OIDC設定（CI/CD使用時のみ）
+```bash
+# OIDCプロバイダー作成（初回のみ）
+aws iam create-open-id-connect-provider \
+  --url https://token.actions.githubusercontent.com \
+  --client-id-list sts.amazonaws.com \
+  --thumbprint-list 6938fd4d98bab03faadb97b34396831e3780aea1
+
+# IAMロール作成
+aws cloudformation create-stack \
+  --stack-name ecs-bg-deploy-github-oidc \
+  --template-body file://aws/cloudformation/github-oidc.yaml \
+  --parameters ParameterKey=ProjectName,ParameterValue=ecs-bg-deploy \
+               ParameterKey=GitHubOrg,ParameterValue=YOUR_GITHUB_USERNAME \
+               ParameterKey=GitHubRepo,ParameterValue=sample-aws-ecs-blue-green-deploy \
+  --capabilities CAPABILITY_NAMED_IAM
+
+# GitHub Secrets設定
+# Settings > Secrets and variables > Actions で AWS_ROLE_ARN を設定
+```
+
+### 開発（ローカルでの検証）
+
+#### ソース修正からデプロイまで
+```bash
+# 1. ソースコード修正
+vim index.html
+
+# 2. 事前検証（オプション）
+./test/verify.sh
+
+# 3. 統合テスト（オプション）
+./test/test-deploy.sh
+
+# 4. 本番デプロイ
+./scripts/dev-deploy.sh v2.0.0
+```
+
+#### 段階的実行
+```bash
+# ビルドのみ
+./scripts/build.sh v2.0.0
+
+# デプロイのみ（既存イメージ使用）
+./scripts/deploy.sh v2.0.0
+```
+
+### GitHub Actionsでのデプロイ
+
+#### 自動デプロイ
+```bash
+# タグプッシュで自動実行
+git tag v2.0.0
+git push origin v2.0.0
+```
+
+#### 手動実行
+- GitHub > Actions > "Blue/Green Deploy" > "Run workflow"
+- バージョンを入力して実行
 
 ## ドキュメント
 
-詳細な情報は **[docs/](docs/)** フォルダを参照してください。
+- **[Blue/Greenデプロイ手順](docs/blue-green-deploy.md)**: デプロイの実行方法
+- **[スクリプト責務設計](docs/scripts-responsibility.md)**: 各スクリプトの役割と使い分け
 
-👉 **[ドキュメント一覧](docs/index.md)** から目的に応じたガイドを選択できます。
-
-## プロジェクト構成
-
+## ディレクトリ構成
 ```
+.
 ├── aws/cloudformation/     # CloudFormationテンプレート
-├── docs/                   # 詳細ドキュメント
+├── docs/                   # ドキュメント
+│   ├── blue-green-deploy.md
+│   └── scripts-responsibility.md
 ├── scripts/               # デプロイスクリプト
+│   ├── build.sh           # イメージビルド・プッシュ
+│   ├── deploy.sh          # Blue/Greenデプロイ
+│   └── dev-deploy.sh      # 統合デプロイ
 ├── test/                  # テスト・検証スクリプト
+│   ├── verify.sh          # 事前検証
+│   └── test-deploy.sh     # 統合テスト
 ├── .github/workflows/     # GitHub Actions
-├── Dockerfile             # アプリケーションイメージ
-├── index.html            # サンプルアプリ
-└── appspec.yaml          # CodeDeploy設定
+├── appspec.yaml          # CodeDeploy設定
+├── Dockerfile            # アプリケーションイメージ
+└── index.html            # サンプルアプリ
 ```
