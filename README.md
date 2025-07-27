@@ -50,7 +50,9 @@ graph LR
 ├── aws/cloudformation/     # CloudFormationテンプレート
 ├── docs/                   # 詳細ドキュメント
 ├── scripts/               # デプロイスクリプト
+├── test/                  # テスト・検証スクリプト
 ├── .github/workflows/     # GitHub Actions
 ├── Dockerfile             # アプリケーションイメージ
+├── index.html            # サンプルアプリ
 └── appspec.yaml          # CodeDeploy設定
 ```
