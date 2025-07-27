@@ -126,16 +126,26 @@ DeploymentType: BLUE_GREEN
 
 #### トラフィック制御
 - **本番トラフィック**: ALBListener（:80） → TargetGroup1（Blue）
-- **テストトラフィック**: TestListener（:8080） → TargetGroup2（Green）
+- **テストトラフィック**: TestListener（:8080） → デプロイ時のみTargetGroup2（Green）、通常時は503エラー
+
+> **注意**: TestListener（:8080）は通常時は503エラーを返し、Blue/Greenデプロイメント実行中のみ新しいバージョン（Green）にアクセス可能になります。これにより本番環境での混乱を防ぎます。
+
+#### Blue/Greenデプロイメントフロー
+1. **通常状態**: 80番ポート（本番）のみ有効、8080番ポートは503エラー
+2. **デプロイ開始**: CodeDeployが新しいタスクセット（Green）をTargetGroup2に登録
+3. **テスト期間**: 8080番ポートから新バージョンにアクセス可能
+4. **トラフィック切り替え**: 80番ポートのトラフィックがGreenに切り替わる
+5. **デプロイ完了**: 古いタスクセット（Blue）が削除され、8080番ポートは再び503エラーに戻る
 
 #### 自動ロールバック設定
 - デプロイ失敗時に自動ロールバック
 - CloudWatchアラーム検知時に自動ロールバック
 - 手動停止時に自動ロールバック
+- Blue環境終了待ち時間: 1分（短縮設定）
 
 #### 出力値
 - `LoadBalancerDNS`: ALBのDNS名
-- `TestEndpoint`: テスト環境のURL
+- `TestEndpoint`: テスト環境のURL（デプロイメント中のみ有効、通常時は503）
 - `CodeDeployApplication`: CodeDeployアプリケーション名
 - `CodeDeployDeploymentGroup`: デプロイメントグループ名
 
