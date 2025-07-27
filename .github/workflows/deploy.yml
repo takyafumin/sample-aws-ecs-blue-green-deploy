@@ -3,11 +3,13 @@ name: Blue/Green Deploy
 on:
   push:
     tags: ['v*']
+    branches: ['main', 'develop', 'feature/*']
   workflow_dispatch:
     inputs:
       version:
         description: 'Version tag'
         required: true
+        default: 'branch-test'
 
 env:
   PROJECT_NAME: ecs-bg-deploy
@@ -32,8 +34,10 @@ jobs:
     - name: Set version
       id: version
       run: |
-        if [ "${{ github.event_name }}" = "push" ]; then
+        if [ "${{ github.event_name }}" = "push" ] && [[ "${{ github.ref }}" == refs/tags/* ]]; then
           echo "version=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+        elif [ "${{ github.event_name }}" = "push" ]; then
+          echo "version=branch-${GITHUB_REF#refs/heads/}-$(date +%s)" >> $GITHUB_OUTPUT
         else
           echo "version=${{ github.event.inputs.version }}" >> $GITHUB_OUTPUT
         fi
