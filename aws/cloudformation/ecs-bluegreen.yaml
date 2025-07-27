@@ -73,6 +73,10 @@ Resources:
           FromPort: 80
           ToPort: 80
           CidrIp: 0.0.0.0/0
+        - IpProtocol: tcp
+          FromPort: 8080
+          ToPort: 8080
+          CidrIp: 0.0.0.0/0
 
   # Security Group for ECS
   ECSSecurityGroup:
@@ -113,7 +117,19 @@ Resources:
         Fn::Sub: '${ProjectName}-VPC'
       HealthCheckPath: /
 
-  # ALB Listener
+  # Target Group 2 (Green)
+  TargetGroup2:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Properties:
+      Name: !Sub '${ProjectName}-tg-2'
+      Port: 80
+      Protocol: HTTP
+      TargetType: ip
+      VpcId: !ImportValue
+        Fn::Sub: '${ProjectName}-VPC'
+      HealthCheckPath: /
+
+  # ALB Listener (Production)
   ALBListener:
     Type: AWS::ElasticLoadBalancingV2::Listener
     Properties:
@@ -122,6 +138,17 @@ Resources:
           TargetGroupArn: !Ref TargetGroup1
       LoadBalancerArn: !Ref ApplicationLoadBalancer
       Port: 80
+      Protocol: HTTP
+
+  # Test Listener (Green Environment)
+  TestListener:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    Properties:
+      DefaultActions:
+        - Type: forward
+          TargetGroupArn: !Ref TargetGroup2
+      LoadBalancerArn: !Ref ApplicationLoadBalancer
+      Port: 8080
       Protocol: HTTP
 
   # ECS Service
@@ -186,7 +213,8 @@ Resources:
           Action: TERMINATE
           TerminationWaitTimeInMinutes: 5
         DeploymentReadyOption:
-          ActionOnTimeout: CONTINUE_DEPLOYMENT
+          ActionOnTimeout: STOP_DEPLOYMENT
+          WaitTimeInMinutes: 10
       ECSServices:
         - ServiceName: !Sub '${ProjectName}-service'
           ClusterName: !Sub '${ProjectName}-cluster'
@@ -194,9 +222,13 @@ Resources:
         TargetGroupPairInfoList:
           - TargetGroups:
               - Name: !GetAtt TargetGroup1.TargetGroupName
+              - Name: !GetAtt TargetGroup2.TargetGroupName
             ProdTrafficRoute:
               ListenerArns:
                 - !Ref ALBListener
+            TestTrafficRoute:
+              ListenerArns:
+                - !Ref TestListener
       AutoRollbackConfiguration:
         Enabled: true
         Events:
@@ -221,3 +253,9 @@ Outputs:
     Value: !Ref CodeDeployDeploymentGroup
     Export:
       Name: !Sub '${ProjectName}-CodeDeployDeploymentGroup'
+  
+  TestEndpoint:
+    Description: Test Endpoint for Green Environment
+    Value: !Sub 'http://${ApplicationLoadBalancer.DNSName}:8080'
+    Export:
+      Name: !Sub '${ProjectName}-TestEndpoint'
