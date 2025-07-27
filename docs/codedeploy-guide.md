@@ -14,7 +14,7 @@
 
 | 設定項目 | 値 | 効果 |
 |---------|---|------|
-| **デプロイ設定** | `CodeDeployDefault.ECSAllAtOnceBlueGreen` | 全トラフィック一括切り替え |
+| **デプロイ設定** | `CodeDeployDefault.ECSAllAtOnce` | 全トラフィック一括切り替え |
 | **デプロイタイプ** | `BLUE_GREEN` | 無停止デプロイメント |
 | **トラフィック制御** | `WITH_TRAFFIC_CONTROL` | ALBによる段階的切り替え |
 
