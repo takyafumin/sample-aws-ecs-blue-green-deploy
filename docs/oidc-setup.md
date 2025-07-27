@@ -48,3 +48,12 @@ echo | openssl s_client -servername token.actions.githubusercontent.com -connect
 
 ### 権限不足エラー
 IAMロールに必要な権限が不足している場合は、[github-oidc.yaml](../aws/cloudformation/github-oidc.yaml)のPoliciesセクションを確認してください。
+
+#### 必要な権限
+- **ECR**: プッシュ・プル権限
+- **ECS**: タスク定義登録・サービス操作
+- **CodeDeploy**: デプロイ作成・監視
+- **CloudFormation**: スタック情報取得
+- **ELB v2**: ロードバランサー・ターゲットグループ情報取得
+- **Elastic Load Balancing**: ロードバランサー操作（レガシーAPI互換）
+- **IAM**: ロール権限の委譲（PassRole）
