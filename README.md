@@ -113,26 +113,53 @@ aws cloudformation describe-stacks --stack-name ecs-bg-deploy-ecs --query 'Stack
 GitHubリポジトリの Settings > Secrets and variables > Actions で以下を設定:
 - `AWS_ROLE_ARN`: 手順1で作成したIAMロールARN
 
-### 8. 次のステップ
-現在はシンプルなECSサービスが稼働中です。Blue/Greenデプロイ機能は今後追加予定です。
+### 8. Blue/Greenデプロイメントへの移行
+
+**既存環境の削除:**
+```bash
+aws cloudformation delete-stack --stack-name ecs-bg-deploy-ecs
+```
+
+**Blue/Green環境の構築:**
+```bash
+aws cloudformation create-stack \
+  --stack-name ecs-bg-deploy-bluegreen \
+  --template-body file://aws/cloudformation/ecs-bluegreen.yaml \
+  --parameters ParameterKey=ProjectName,ParameterValue=ecs-bg-deploy \
+               ParameterKey=ImageTag,ParameterValue=latest \
+  --capabilities CAPABILITY_IAM
+```
+
+**新バージョンのデプロイ:**
+```bash
+# スクリプトを使用（推奨）
+./scripts/deploy.sh v2.0.0
+
+# または手動でCodeDeployを実行
+# 詳細は docs/blue-green-deploy.md を参照
+```
 
 ## ディレクトリ構成
 ```
 .
 ├── aws/
 │   └── cloudformation/
-│       ├── github-oidc.yaml  # GitHub OIDC設定
-│       ├── network.yaml      # ネットワーク構成
-│       ├── ecr.yaml          # ECRリポジトリ
-│       ├── ecs-simple.yaml   # シンプルECSサービス
-│       └── ecs.yaml          # Blue/Green ECSサービス（未完成）
+│       ├── github-oidc.yaml    # GitHub OIDC設定
+│       ├── network.yaml        # ネットワーク構成
+│       ├── ecr.yaml            # ECRリポジトリ
+│       ├── ecs-simple.yaml     # シンプルECSサービス
+│       └── ecs-bluegreen.yaml  # Blue/Green ECSサービス
 ├── docs/
-│   ├── ecs-setup.md      # ECS構築ガイド
-│   └── oidc-setup.md     # OIDC設定ガイド
+│   ├── ecs-setup.md        # ECS構築ガイド
+│   ├── oidc-setup.md       # OIDC設定ガイド
+│   └── blue-green-deploy.md # Blue/Greenデプロイ手順
+├── scripts/
+│   └── deploy.sh           # Blue/Greenデプロイスクリプト
 ├── .github/
 │   └── workflows/
-│       └── deploy.yml        # GitHub Actions（未完成）
-├── Dockerfile                # アプリケーションイメージ
-├── index.html               # サンプルアプリ
+│       └── deploy.yml          # GitHub Actions（未完成）
+├── appspec.yaml                # CodeDeploy設定
+├── Dockerfile                  # アプリケーションイメージ
+├── index.html                 # サンプルアプリ
 └── README.md
 ```
