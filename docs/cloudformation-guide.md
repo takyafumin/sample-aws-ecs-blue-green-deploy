@@ -283,12 +283,29 @@ aws cloudformation describe-stack-events --stack-name <stack-name>
 # ECSサービス状態
 aws ecs describe-services --cluster ecs-bg-deploy-cluster --services ecs-bg-deploy-service
 
-# CodeDeployデプロイ状況
-aws deploy get-deployment --deployment-id <deployment-id>
+# CodeDeployアプリケーション・デプロイメントグループ確認
+aws deploy list-applications
+aws deploy list-deployment-groups --application-name ecs-bg-deploy-app
+
+# デプロイメント履歴
+aws deploy list-deployments \
+  --application-name ecs-bg-deploy-app \
+  --deployment-group-name ecs-bg-deploy-dg
+
+# 最新デプロイ状況
+aws deploy get-deployment --deployment-id <deployment-id> \
+  --query 'deploymentInfo.{Status:status,CreatedTime:createTime,CompleteTime:completeTime}'
+
+# リアルタイム監視
+watch -n 5 'aws deploy get-deployment --deployment-id <deployment-id> --query "deploymentInfo.status" --output text'
 
 # ALBターゲット状態
 aws elbv2 describe-target-health --target-group-arn <target-group-arn>
 ```
+
+#### CodeDeployコンソール
+AWS Management Console → CodeDeploy → Applications → `ecs-bg-deploy-app`  
+https://console.aws.amazon.com/codesuite/codedeploy/applications
 
 ## ベストプラクティス
 
