@@ -29,7 +29,7 @@ TASK_DEF_ARN=$(aws ecs register-task-definition \
   --requires-compatibilities FARGATE \
   --cpu 256 \
   --memory 512 \
-  --execution-role-arn $(aws cloudformation describe-stacks --stack-name ${PROJECT_NAME}-bluegreen --query 'Stacks[0].Outputs[?OutputKey==`TaskExecutionRoleArn`].OutputValue' --output text) \
+  --execution-role-arn $(aws cloudformation describe-stacks --stack-name ${PROJECT_NAME}-base --query 'Stacks[0].Outputs[?OutputKey==`TaskExecutionRoleArn`].OutputValue' --output text) \
   --container-definitions "[{
     \"name\": \"app\",
     \"image\": \"${ECR_URI}:${VERSION}\",
